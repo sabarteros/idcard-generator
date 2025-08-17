@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>ID Card Generator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body{
+      font-family:Poppins,system-ui,Arial,sans-serif;
+      background:#111;color:#eee;
+      display:flex;flex-direction:column;gap:16px;
+      align-items:center;padding:20px
+    }
+    .idcard{
+      position:relative;
+      width:6.5cm;height:11cm;
+      background:url("background.png") center/cover no-repeat;
+      overflow:hidden
+    }
+    #foto{
+      position:absolute;
+      left:0.97cm;top:2.58cm;
+      width:4.56cm;height:6.95cm;
+      object-fit:cover;
+    }
+    #nama{
+      position:absolute;
+      top:9.35cm;
+      width:100%;
+      text-align:center;
+      font-size:13.6pt;
+      font-weight:700;
+      color:#fff;
+      line-height:1.1;
+      padding:0 10px;
+      word-break:break-word;
+    }
+    #jabatan{
+      position:absolute;
+      top:9.9cm;
+      width:100%;
+      text-align:center;
+      font-size:4.8pt;
+      font-weight:700;
+      color:#fff;
+      line-height:1.1;
+      padding:0 10px;
+      word-break:break-word;
+    }
+    .panel{
+      display:flex;gap:10px;flex-wrap:wrap;
+      align-items:center;justify-content:center
+    }
+    input[type="text"]{
+      padding:8px;border-radius:8px;border:1px solid #333;
+      background:#1b1b1b;color:#eee;min-width:220px
+    }
+    input[type="file"]{color:#ddd}
+    button{
+      padding:10px 14px;border-radius:10px;border:0;
+      background:#e53935;color:#fff;cursor:pointer;font-weight:700
+    }
+    button:disabled{opacity:.6;cursor:not-allowed}
+  </style>
+</head>
+<body>
+
+  <div class="idcard" id="idcard">
+    <img id="foto" alt="foto"/>
+    <div id="nama">Nama</div>
+    <div id="jabatan">Jabatan</div>
+  </div>
+
+  <div class="panel">
+    <input type="file" id="upload" accept="image/*">
+    <input type="text" id="inputNama" placeholder="Nama">
+    <input type="text" id="inputJabatan" placeholder="Jabatan">
+    <button id="btnDownload" disabled>Download PNG</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script>
+    const API_KEY = "t2xwQW5wfNcLwbW4EXeDdqwL";
+    const el = {
+      card: document.getElementById("idcard"),
+      foto: document.getElementById("foto"),
+      upload: document.getElementById("upload"),
+      inNama: document.getElementById("inputNama"),
+      inJbt: document.getElementById("inputJabatan"),
+      nama: document.getElementById("nama"),
+      jbt: document.getElementById("jabatan"),
+      dl: document.getElementById("btnDownload"),
+    };
+
+    el.inNama.addEventListener("input", () => el.nama.textContent = el.inNama.value || " ");
+    el.inJbt.addEventListener("input", () => el.jbt.textContent = el.inJbt.value || " ");
+
+    // Upload + remove.bg
+    el.upload.addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      el.dl.disabled = true;
+
+      const fd = new FormData();
+      fd.append("image_file", file, file.name);
+      fd.append("size", "auto");
+
+      try {
+        const res = await fetch("https://api.remove.bg/v1.0/removebg", {
+          method: "POST",
+          headers: { "X-Api-Key": API_KEY },
+          body: fd,
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        el.foto.onload = () => URL.revokeObjectURL(url);
+        el.foto.src = url;
+        el.dl.disabled = false;
+      } catch (err) {
+        alert("Gagal remove.bg: " + err.message);
+      }
+    });
+
+    // Download dengan ukuran fix 1299x767 px (≈ 11x6.5cm @300dpi)
+    el.dl.addEventListener("click", async () => {
+      try {
+        const canvas = await html2canvas(el.card, {
+          scale: 3,
+          useCORS: true,
+          backgroundColor: "#111"
+        });
+
+        const targetW = 767, targetH = 1299;
+        const out = document.createElement("canvas");
+        out.width = targetW;
+        out.height = targetH;
+        const ctx = out.getContext("2d");
+
+        const scale = Math.min(targetW / canvas.width, targetH / canvas.height);
+        const drawW = canvas.width * scale;
+        const drawH = canvas.height * scale;
+        const dx = (targetW - drawW) / 2;
+        const dy = (targetH - drawH) / 2;
+
+        ctx.drawImage(canvas, dx, dy, drawW, drawH);
+
+        const link = document.createElement("a");
+        link.download = "idcard.png";
+        link.href = out.toDataURL("image/png");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        alert("Gagal render ID Card: " + err.message);
+      }
+    });
+  </script>
+</body>
+</html>
